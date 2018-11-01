@@ -10,7 +10,8 @@ include_directories(/usr/src/sys/cddl/contrib/opensolaris/uts/common/)
 
 add_executable(DTraceConsumer main.cpp dtraceHandler.cpp dtraceHandler.h)
 add_executable(HelloWorldTest tests/HelloWorldTest.cpp)
-add_executable(ReadFileTest tests/ReadFIleTest.cpp)
+add_executable(ReadFileTest tests/ReadFileTest.cpp)
+add_executable(BasicForkTest tests/BasicForkTest.cpp)
 
 TARGET_LINK_LIBRARIES(DTraceConsumer dtrace)
 TARGET_LINK_LIBRARIES(DTraceConsumer proc)
