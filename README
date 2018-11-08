@@ -22,12 +22,12 @@ make
 
 ## How To Run:
 Parameters can be in any order.
-    Required parameters
-    * -p <processID>        : process ID of process to audit
-
+    Required parameters (at most one)
+	* -p <processID>        : process ID of process to audit
+	* -pn <processName>	: name of target process to audit
     Optional parameters
-    * -o <reportFilename>   : user defined file name for report
-    * -g <groupIDs>         : select the group(s) to record and delimited by commas if multiple
+	* -o <reportFilename>   : user defined file name for report
+	* -g <groupIDs>         : select the group(s) to record and delimited by commas if multiple
 
     Example: ./DTraceConsumer 51162 -o TerminalTest -g IO,sys,net
 
