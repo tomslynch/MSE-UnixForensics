@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/thomaslynch/CLionProjects/DTraceConsumer/tests/HelloWorldTest.cpp
+iostream
+-
+cstdio
+-
+zconf.h
+-
+cstdint
+-
+

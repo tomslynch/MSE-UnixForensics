@@ -1,0 +1,6 @@
+/Users/thomaslynch/CLionProjects/DTraceConsumer/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/thomaslynch/CLionProjects/DTraceConsumer/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/thomaslynch/CLionProjects/DTraceConsumer/cmake-build-debug/CMakeFiles/HelloWorldTest.dir
+/Users/thomaslynch/CLionProjects/DTraceConsumer/cmake-build-debug/CMakeFiles/BasicForkTest.dir
+/Users/thomaslynch/CLionProjects/DTraceConsumer/cmake-build-debug/CMakeFiles/ReadFileTest.dir
+/Users/thomaslynch/CLionProjects/DTraceConsumer/cmake-build-debug/CMakeFiles/DTraceConsumer.dir
