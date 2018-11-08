@@ -6,15 +6,64 @@
 #include <string>
 #include <ctime>
 #include <iostream>
+#include <set>
+#include <map>
+#include <unordered_set>
+#include <list>
 
 using namespace std;
 
 static dtrace_hdl_t* d_handle;
 static FILE *fp;
 string userDefinedFilename = "";
+string targetName = "";
+bool isProcessRunning = true;
+list <string> SyscallList = {};
+set <string> UniqueSyscalls = {};
+map <string, int> SyscallCounts = {};
+
+template<typename A, typename B>
+std::pair<B,A> flip_pair(const std::pair<A,B> &p)
+{
+    return std::pair<B,A>(p.second, p.first);
+}
+
+template<typename A, typename B>
+std::multimap<B,A> flip_map(const std::map<A,B> &src)
+{
+    std::multimap<B,A> dst;
+    std::transform(src.begin(), src.end(), std::inserter(dst, dst.begin()),
+                   flip_pair<A,B>);
+    return dst;
+}
 
 static void WriteToReports(char* output){
-    fprintf(fp, "%s\n", output);
+    char buffer[256];
+    std::time_t t = std::time(0);   // get time now
+    std::tm* now = std::localtime(&t);
+    strftime(buffer, sizeof(buffer), "%H:%M:%S", now);
+
+    fprintf(fp, "[%s]\t%s\n", buffer, output);
+}
+
+static void WriteSummary(){
+    std::multimap<int, string> SortedSyscallCounts = flip_map(SyscallCounts);
+
+    string summary = "\n************* SUMMARY *************\n";
+    fprintf(fp, "%s", summary.c_str());
+//    for(auto s : UniqueSyscalls) {
+////        char buff[100];
+////        summary += sprintf("%s\t%ul\n", s, std::to_string(SyscallList.count(s));
+////        summary += s + "\t" + std::to_string(SyscallCounts[s]) + "\n";
+//        fprintf(fp, "%s\t%s\n", s.c_str(), std::to_string(SyscallCounts[s]).c_str());
+//    }
+
+    for (auto const& x : SortedSyscallCounts)
+    {
+        fprintf(fp, "%s\t%s\n", std::to_string(x.first).c_str(), x.second.c_str());
+    }
+
+//    fprintf(fp, "%s", summary.c_str());
 }
 
 string trim(const string& str)
@@ -41,7 +90,19 @@ static int chewrec (const dtrace_probedata_t *data, const dtrace_recdesc_t *rec,
     strncpy(name, probeData->dtpd_func, DTRACE_FUNCNAMELEN);
 
     if (strcmp("sigaction", name) != 0 && strcmp("sigprocmask", name) != 0 && strcmp("sigaltstack", name) != 0) {
+        if (strcmp("exit", name) == 0) {
+            isProcessRunning = false;
+        }
         WriteToReports(name);
+        UniqueSyscalls.insert(name);
+//        SyscallList.insert(name);
+        auto search = SyscallCounts.find(name);
+        if (search != SyscallCounts.end()) {
+            SyscallCounts[name]++;
+        } else {
+            SyscallCounts.insert({name, 1});
+        }
+//        SyscallCounts.insert(name);
     }
 
     return (DTRACE_CONSUME_THIS);
@@ -77,14 +138,22 @@ int main (int argc, char** argv) {
         if (strcmp(argv[i], "-o") == 0) {
             userDefinedFilename = argv[i+1];
         }
+
+        if (strcmp(argv[i], "-pn") == 0) {
+            targetName = argv[i+1];
+        }
     }
 
-    if (processID.length() == 0) {
+    string g_prog;
+    if (strcmp(targetName.c_str(), "") != 0) {
+        g_prog ="syscall:::entry /execname == \"" + targetName + "\"/ {}";
+    } else if (processID.length() == 0) {
         printf("Invalid arguments...");
         return -1;
+    } else {
+        g_prog ="syscall:::entry /pid == " + processID + "/ {}";
     }
 
-    string g_prog = "syscall:::entry /pid == " + processID + "/ {}";
     printf("%s/n", g_prog.c_str());
 
     if ((d_handle = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
@@ -166,7 +235,12 @@ int main (int argc, char** argv) {
                 fprintf(stderr, "processing aborted");
                 return -1;
         }
-    } while (!done);
+    } while (!done && isProcessRunning);
+
+    if (!isProcessRunning) {
+        printf("Target process has exited...\n");
+        WriteSummary();
+    }
 
     printf("closing dtrace\n");
     dtrace_close(d_handle);
