@@ -15,11 +15,9 @@ using namespace std;
 
 static dtrace_hdl_t* d_handle;
 static FILE *fp;
-string userDefinedFilename = "";
-string targetName = "";
+string userDefinedFilename;
+string targetName;
 bool isProcessRunning = true;
-list <string> SyscallList = {};
-set <string> UniqueSyscalls = {};
 map <string, int> SyscallCounts = {};
 
 template<typename A, typename B>
@@ -39,7 +37,7 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
 
 static void WriteToReports(char* output){
     char buffer[256];
-    std::time_t t = std::time(0);   // get time now
+    std::time_t t = std::time(nullptr);   // get time now
     std::tm* now = std::localtime(&t);
     strftime(buffer, sizeof(buffer), "%H:%M:%S", now);
 
@@ -47,77 +45,55 @@ static void WriteToReports(char* output){
 }
 
 static void WriteSummary(){
-    std::multimap<int, string> SortedSyscallCounts = flip_map(SyscallCounts);
-
     string summary = "\n************* SUMMARY *************\n";
     fprintf(fp, "%s", summary.c_str());
-//    for(auto s : UniqueSyscalls) {
-////        char buff[100];
-////        summary += sprintf("%s\t%ul\n", s, std::to_string(SyscallList.count(s));
-////        summary += s + "\t" + std::to_string(SyscallCounts[s]) + "\n";
-//        fprintf(fp, "%s\t%s\n", s.c_str(), std::to_string(SyscallCounts[s]).c_str());
-//    }
 
+    std::multimap<int, string> SortedSyscallCounts = flip_map(SyscallCounts);
     for (auto const& x : SortedSyscallCounts)
     {
         fprintf(fp, "%s\t%s\n", std::to_string(x.first).c_str(), x.second.c_str());
     }
-
-//    fprintf(fp, "%s", summary.c_str());
 }
 
-string trim(const string& str)
-{
-    size_t first = str.find_first_not_of(' ');
-    if (string::npos == first)
-    {
-        return str;
-    }
-    size_t last = str.find_last_not_of(' ');
-    return str.substr(first, (last - first + 1));
-}
+//string trim(const string& str)
+//{
+//    size_t first = str.find_first_not_of(' ');
+//    if (string::npos == first)
+//    {
+//        return str;
+//    }
+//    size_t last = str.find_last_not_of(' ');
+//    return str.substr(first, (last - first + 1));
+//}
 
 static int chewrec (const dtrace_probedata_t *data, const dtrace_recdesc_t *rec, void *arg) {
-//    printf("chewing dtrace record ..\n");
-
-    // A NULL rec indicates that we've processed the last record.
+// A NULL rec indicates that we've processed the last record.
 //    if (rec == NULL) {
 //        return (DTRACE_CONSUME_NEXT);
 //    }
     dtrace_probedesc_t *probeData = data->dtpda_pdesc;
-
     char name[DTRACE_FUNCNAMELEN];
     strncpy(name, probeData->dtpd_func, DTRACE_FUNCNAMELEN);
 
     if (strcmp("sigaction", name) != 0 && strcmp("sigprocmask", name) != 0 && strcmp("sigaltstack", name) != 0) {
-        if (strcmp("exit", name) == 0) {
-            isProcessRunning = false;
-        }
         WriteToReports(name);
-        UniqueSyscalls.insert(name);
-//        SyscallList.insert(name);
+        //add to map
         auto search = SyscallCounts.find(name);
         if (search != SyscallCounts.end()) {
             SyscallCounts[name]++;
         } else {
             SyscallCounts.insert({name, 1});
         }
-//        SyscallCounts.insert(name);
+        //check if end of proc
+        if (strcmp("exit", name) == 0) {
+            isProcessRunning = false;
+        }
     }
 
     return (DTRACE_CONSUME_THIS);
 }
 
-
-
-//static const char* g_prog = "syscall::open*:entry { printf(\"%s %s\\n\", execname, copyinstr(arg0)); }";
-
-//static const char* g_prog = "BEGIN { printf(\"hello from dtrace\\n\"); }";
 //static const char* g_prog = "syscall:::entry /pid == 55614/ { printf(\"%s %s\\n\", execname, copyinstr(arg0)); }";
-//static const char* g_prog = "syscall:::entry /pid == 55614/ {printf(\"%s\\n\", execname)}";
-//static const char* g_prog = "syscall:::entry /pid == 55614/ {}";
-
-
 static int g_intr;
 static int g_exited;
 
@@ -127,7 +103,7 @@ static void intr (int signo) {
 
 int main (int argc, char** argv) {
     int err;
-    string processID = "";
+    string processID;
 
     //parse arguments
     for (int i = 0; i < argc-1; i++) {
@@ -156,8 +132,8 @@ int main (int argc, char** argv) {
 
     printf("%s/n", g_prog.c_str());
 
-    if ((d_handle = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
-        fprintf(stderr, "failed to initialize dtrace: %s\n", dtrace_errmsg(NULL, err));
+    if ((d_handle = dtrace_open(DTRACE_VERSION, 0, &err)) == nullptr) {
+        fprintf(stderr, "failed to initialize dtrace: %s\n", dtrace_errmsg(nullptr, err));
         return -1;
     }
     printf("Dtrace initialized\n");
@@ -167,7 +143,7 @@ int main (int argc, char** argv) {
     printf("dtrace options set\n");
 
     dtrace_prog_t *prog;
-    if ((prog = dtrace_program_strcompile(d_handle, g_prog.c_str(), DTRACE_PROBESPEC_NAME, 0, 0, NULL)) == NULL) {
+    if ((prog = dtrace_program_strcompile(d_handle, g_prog.c_str(), DTRACE_PROBESPEC_NAME, 0, 0, nullptr)) == nullptr) {
         fprintf(stderr, "failed to compile dtrace program\n");
         return -1;
     } else {
@@ -187,8 +163,8 @@ int main (int argc, char** argv) {
     (void) sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
     act.sa_handler = intr;
-    (void) sigaction(SIGINT, &act, NULL);
-    (void) sigaction(SIGTERM, &act, NULL);
+    (void) sigaction(SIGINT, &act, nullptr);
+    (void) sigaction(SIGTERM, &act, nullptr);
 
     printf("Hit");
 
@@ -199,8 +175,8 @@ int main (int argc, char** argv) {
     } else {
         //open file
         if (userDefinedFilename.length() == 0) {
-            time_t t = std::time(0);
-            long int intNow = static_cast<long int> (t);
+            time_t t = std::time(nullptr);
+            auto intNow = static_cast<long int> (t);
             fp = fopen(to_string(intNow).c_str(), "w+");
         } else {
             fp = fopen(userDefinedFilename.c_str(), "w+");
@@ -224,7 +200,7 @@ int main (int argc, char** argv) {
             }
         }
 
-        switch (dtrace_work(d_handle, stdout, NULL, chewrec, NULL)) {
+        switch (dtrace_work(d_handle, stdout, nullptr, chewrec, nullptr)) {
 //        switch (dtrace_work(d_handle, stdout, NULL, aggfun, NULL)) {
             case DTRACE_WORKSTATUS_DONE:
                 done = 1;
