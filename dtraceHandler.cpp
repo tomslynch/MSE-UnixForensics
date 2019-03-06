@@ -40,7 +40,7 @@ void dtraceHandler::StartDtrussProcess(string targetName, string processID, pid_
 //    string[2] command;
     string command = (strcmp(targetName.c_str(), "") != 0) ? "-n " + targetName : "-p " + processID;
 
-    std::cout << command << std::endl;
+//    std::cout << command << std::endl;
 
     int rs;
     if (pid == 0) {
@@ -65,9 +65,9 @@ void dtraceHandler::StartDtrussProcess(string targetName, string processID, pid_
         close(fd);
 
         if (strcmp(targetName.c_str(), "") != 0) {
-            rs = execl("/usr/bin/dtruss", "dtruss", "-n", targetName.c_str(), nullptr);
+            rs = execl("/usr/bin/dtruss", "dtruss", "-af", "-n", targetName.c_str(), nullptr);
         } else {
-            rs = execl("/usr/bin/dtruss", "dtruss", "-p", processID.c_str(), nullptr);
+            rs = execl("/usr/bin/dtruss", "dtruss", "-af", "-p", processID.c_str(), nullptr);
         }
 
         printf("Done");
@@ -224,6 +224,7 @@ bool dtraceHandler::StartDTrace(){
 }
 
 void dtraceHandler::Destroy(){
+    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
     printf("closing dtrace\n");
     dtrace_close(d_handle);
     printf("closing dtruss\n");

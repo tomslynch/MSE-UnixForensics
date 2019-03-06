@@ -53,19 +53,21 @@ int main (int argc, char** argv) {
         }
     }
 
+
     IOHandler ioHandler = IOHandler(userDefinedFilename);
+    ioHandler.ReadInGroups("");
+
     dtraceHandler dtHandle = dtraceHandler(targetName, processID, ioHandler);
     if (dtHandle.StartDTrace()) {
-//        if (!dtHandle.IsProcessRunning()) {
-//            //write out
-////                    WriteSummary(dtHandle.GetSyscallCounts(), ioHandler.fp );
-//ioHandler.WriteSummary(dtHandle.GetSyscallCounts());
-//                    ioHandler.ParseTraceFile();
-//        }
-std::cout << dtHandle.GetSyscallCounts().size() << std::endl;
+        if (!dtHandle.IsProcessRunning()) {
+            //write out
+//          WriteSummary(dtHandle.GetSyscallCounts(), ioHandler.fp );
+//            ioHandler.WriteSummary(dtHandle.GetSyscallCounts());
+//            ioHandler.ParseTraceFile();
+        }
+//        std::cout << dtHandle.GetSyscallCounts().size() << std::endl;
         ioHandler.WriteSummary(dtHandle.GetSyscallCounts());
         ioHandler.ParseTraceFile();
-
     }
 
     dtHandle.Destroy();

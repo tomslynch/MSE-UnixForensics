@@ -23,6 +23,9 @@
 #include <fstream>
 #include <fcntl.h>
 
+#include <chrono>
+#include <thread>
+
 using std::string;
 using std::time;
 using std::to_string;
@@ -47,7 +50,6 @@ private:
         pid_t dtrussPid;
 
 //        static dtrace_hdl_t* d_handle;
-
         string userDefinedFilename;
 //        string targetName;
 //        string processID;
@@ -57,9 +59,6 @@ private:
     static int chewrec(const dtrace_probedata_t *data, const dtrace_recdesc_t *rec, void *arg);
     void static StartDtrussProcess(string targetName, string processID, pid_t pid);
         bool InitDTrace(string targetName, string processID);
-//    static int chewrec (const dtrace_probedata_t *data,
-//            const dtrace_recdesc_t *rec,
-//            void *arg);
 };
 
 

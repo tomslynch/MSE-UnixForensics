@@ -1,39 +1,15 @@
 //
 // Created by Thomas Lynch on 2/8/19.
 //
-//#include <stdio.h>
-
-#include <ctime>
-#include <map>
 #include "IOHandler.h"
-#include <regex>
-#include <iostream>
-#include <fstream>
-
-//#include <zconf.h>
-
 
 using namespace std;
 
-
-
-struct SyscallData {
-    string name;
-    string group;
-    string* args;
-    string ret;
-    string retDesc;
-};
-
-struct TraceData {
-//    int pid;
-    string pid;
-    string tid;
-    SyscallData sysInfo;
-};
-
 //string filename;
 static FILE *fp;
+string const IOHandler::DEFAULT_GROUP_PATH = "conf/groupInfo.txt"; //Add to a conf file later?
+map<string, int> IOHandler::groupMap;
+vector<string> IOHandler::groupNames;
 
 IOHandler::IOHandler() = default;
 
@@ -46,7 +22,7 @@ IOHandler::IOHandler(string fn) {
         logFN = fn;
     }
 
-    fp = NULL;
+    fp = nullptr;
 }
 
 //fputs("<<Syscalls>>\nDETAILED SECTION:\n", fp);
@@ -66,7 +42,7 @@ void IOHandler::OpenFile(){
 
  }
 
-void IOHandler::Destroy() {
+void IOHandler::Destroy() { // early march
     if (fp != nullptr) {
         fclose(fp);
     }
@@ -101,46 +77,71 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
 
 ////static TraceData ParseTraceLine(string line){
  void IOHandler::ParseTraceLine(string line){
-    regex p("^.*:");
-    regex p2(":.*\\(.*\\)");
-    regex p3("=.*$");
-
-    TraceData td;
-    // grab pid and tid
+    SyscallData sd;
     smatch m;
-    if (regex_search(line, m, p)) {
-//        std::cout << m.str(0) << std::endl;
-        string test = m.str(0);
-//        td.pid = stoi(test.substr(0, test.find('/')));
-        td.pid = test.substr(0, test.find('/'));
-        td.tid = test.substr(test.find('/')+1, (test.length()-2) - test.find('/'));
+
+    // grab pid and tid
+    regex pidPattern("^.*:");
+    string match;
+    if (regex_search(line, m, pidPattern)) {
+        match = m.str(0);
+        sd.pid = match.substr(0, match.find('/'));
+        sd.tid = match.substr(match.find('/')+1, (match.length()-2) - match.find('/'));
+    }
+
+    //grab times
+    regex timePattern("(\\d+\\s+){3}");
+    if (regex_search(line, m, timePattern)) {
+        match = m.str(0);
+        stringstream ssin(match);
+        int i = 0;
+        while (ssin.good() && i < 3){
+            switch (i) {
+                case 0:
+                    ssin >> sd.relTime;
+                    break;
+                case 1:
+                    ssin >> sd.elapsedTime;
+                case 2:
+                    ssin >> sd.cpuTime;
+            }
+            ++i;
+        }
     }
 
     //grab syscall
-    if (regex_search(line, m, p2)) {
-        string match = m.str(0);
-        td.sysInfo = SyscallData();
-        td.sysInfo.name = match.substr(1, match.find('('));
-        td.sysInfo.group = "";
+    regex syscallPattern("[^-\\s]*\\(.*=");
+    if (regex_search(line, m, syscallPattern)) {
+        match = m.str(0);
+        sd.name = match.substr(0, match.find('('));
 
         //grab args
         regex argR("\\(.*\\)");
         if (regex_search(match, m, argR)) {
-            size_t pos = 1;
-            string token;
             string tmp = m.str(0);
-            cout << tmp << endl;
-            tmp.erase(0,1);
-            while((pos = tmp.find(',')) !=  string::npos){
-                token = tmp.substr(0, pos);
-                cout << "\t" + token << endl;
-                tmp.erase(0, pos + 1);
+            string token;
+            size_t pos;
+            while((pos = tmp.find(',')) != string::npos){
+                tmp.erase(0,1);
+                token = tmp.substr(0, pos-1);
+                sd.args.push_back(token);
+                tmp.erase(0, pos);
             }
+            tmp.erase(0,1);
             tmp.erase(tmp.length()-1, tmp.length());
-            cout << "\t" + tmp << endl;
+            sd.args.push_back(tmp);
         }
 
         //grab return info
+        regex returnPattern("=.*$");
+        if (regex_search(line, m, returnPattern)) {
+            match = m.str(0);
+            match = match.substr(2, match.length());
+            sd.ret = match.substr(0, match.find(' '));
+            sd.retDesc = match.substr(match.find(' ')+1, (match.length()-1) - match.find(' '));
+        }
+
+        cout << sd.toString() << endl;
     }
 }
 
@@ -156,5 +157,51 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
         myfile.close();
     } else {
         cout << "Unable to open file\n";
+    }
+}
+
+void IOHandler::ReadInGroups(string filepath){
+    cout << "Reading in grouping file..." << endl;
+    if(filepath == ""){
+        filepath = DEFAULT_GROUP_PATH;
+    }
+
+    cout << filepath << endl;
+
+    ifstream file(filepath.c_str());
+    int idx = 0;
+    string tmp;
+    string line;
+    while(getline(file, line)){
+        istringstream ss(line);
+
+        if (getline(ss, line, ',')) {
+            groupNames.push_back(line);
+
+            while(getline(ss, line, ',')){
+                tmp = "";
+                line.erase(0,1);
+                for (int i = 0; i < line.size(); i++){
+                    tmp += tolower(line[i]);
+                }
+
+                groupMap.insert({tmp, idx});
+            }
+        }
+        idx++;
+    }
+}
+
+string IOHandler::GetGroup(string syscall){
+    if (groupMap.find(syscall) != groupMap.end()) {
+        return groupNames[groupMap[syscall]];
+    } else {
+        return "UNKNOWN";
+    }
+}
+
+void IOHandler::DEBUGPrintVector(vector<string> v){
+    for (int i = 0; i < v.size(); i++) {
+        cout << v[i] << endl;
     }
 }
