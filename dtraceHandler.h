@@ -5,7 +5,6 @@
 #ifndef UNTITLED_DTRACEHANDLER_H
 #define UNTITLED_DTRACEHANDLER_H
 
-
 #include <stdio.h>
 #include <assert.h>
 #include <string>
@@ -37,6 +36,8 @@ using std::to_string;
             bool StartDTrace();
             void Destroy();
     std::map <string, int> GetSyscallCounts();
+    std::vector<string> GetSyscallList();
+    std::chrono::steady_clock::time_point GetTargetStart();
     void static SetIsProcessRunning(bool vl);
 
 private:
@@ -56,6 +57,11 @@ private:
 //        static int g_intr;
 //        static int g_exited;
     static std::map <string, int> SyscallCounts;
+    static std::vector <string> SyscallList;
+
+    static bool hasTargetStarted;
+    static std::chrono::steady_clock::time_point targetStart;
+
     static int chewrec(const dtrace_probedata_t *data, const dtrace_recdesc_t *rec, void *arg);
     void static StartDtrussProcess(string targetName, string processID, pid_t pid);
         bool InitDTrace(string targetName, string processID);

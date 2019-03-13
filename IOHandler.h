@@ -20,7 +20,11 @@ using std::string;
 
 class IOHandler {
     public:
-        void WriteSummary(std::map <string, int> syscallCounts);
+        void GenerateReport(string targetName,
+                std::map<string, int> syscallCounts,
+                std::vector<string> syscallList,
+                std::chrono::steady_clock::time_point targetStart,
+                std::chrono::steady_clock::time_point progStart);
         IOHandler();
         explicit IOHandler(string fn);
         void OpenFile();
@@ -56,14 +60,21 @@ class IOHandler {
 //    static FILE *fp;
 
     void ParseTraceFile();
-    void ParseTraceLine(string line);
+    SyscallData ParseTraceLine(string line);
     private:
-        void WriteHeader();
+        std::string GetTotalCPUTime();
+        void WriteHeader(string targetName,
+                std::chrono::steady_clock::time_point targetStart,
+                std::chrono::steady_clock::time_point progStart);
+        void WriteSummary(std::map<string, int> syscallCounts);
+        void WriteDTraceList(std::vector<string> syscallList);
+        void WriteDTrussList();
         void DEBUGPrintVector(std::vector<string> v);
         string logFN;
         string tmpFN;
+//        string target;
         static string const DEFAULT_GROUP_PATH;
-
+        static std::vector<SyscallData> dtrussSyscallList;
 };
 #endif //DTRACECONSUMER_IOHANDLER_H
 

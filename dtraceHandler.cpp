@@ -14,8 +14,11 @@ static dtrace_hdl_t* d_handle;
 IOHandler dtraceHandler::ioHandler;
 bool dtraceHandler::isProcessRunning;
 std::map <string, int> dtraceHandler::SyscallCounts;
+std::vector <string> dtraceHandler::SyscallList;
 pid_t dtrussPid;
-bool test;
+bool couldInit = false;
+bool dtraceHandler::hasTargetStarted = false;
+std::chrono::steady_clock::time_point dtraceHandler::targetStart;
 
 static int g_intr;
 static void intr (int signo) {
@@ -27,24 +30,31 @@ dtraceHandler::dtraceHandler(string targetName, string processID, IOHandler io) 
     dtrussPid = -1;
     ioHandler = io;
     SyscallCounts = {};
-    test = false;
-    test = InitDTrace(targetName, processID);
+    couldInit = InitDTrace(targetName, processID);
 }
 
 std::map <string, int> dtraceHandler::GetSyscallCounts() {
     return SyscallCounts;
 }
 
+std::vector<string> dtraceHandler::GetSyscallList() {
+    return SyscallList;
+}
+
+std::chrono::steady_clock::time_point dtraceHandler::GetTargetStart(){
+    return targetStart;
+}
+
 //TODO: add file
 void dtraceHandler::StartDtrussProcess(string targetName, string processID, pid_t pid){
 //    string[2] command;
-    string command = (strcmp(targetName.c_str(), "") != 0) ? "-n " + targetName : "-p " + processID;
+//    string command = (strcmp(targetName.c_str(), "") != 0) ? "-n " + targetName : "-p " + processID;
 
 //    std::cout << command << std::endl;
 
     int rs;
     if (pid == 0) {
-        printf("Starting DTruss...\n");
+        std::cout << "Starting DTruss..." << std::endl;
 
         time_t t = time(nullptr);
         auto intNow = static_cast<long int> (t);
@@ -59,6 +69,7 @@ void dtraceHandler::StartDtrussProcess(string targetName, string processID, pid_
 
         if (fd == 0) {
             printf("Could not open file...\n");
+            return;
         }
 
         dup2(fd, STDERR_FILENO);
@@ -84,7 +95,21 @@ int dtraceHandler::chewrec (const dtrace_probedata_t *data, const dtrace_recdesc
     strncpy(name, probeData->dtpd_func, DTRACE_FUNCNAMELEN);
 
     if (strcmp("sigaction", name) != 0 && strcmp("sigprocmask", name) != 0 && strcmp("sigaltstack", name) != 0) {
-        ioHandler.WriteToReports(name);
+
+        //set time
+        if (!hasTargetStarted) {
+            hasTargetStarted = true;
+            targetStart = std::chrono::steady_clock::now();
+        }
+
+        //add to list
+        char buffer[256];
+        std::time_t t = std::time(nullptr);   // get time now
+        std::tm* now = std::localtime(&t);
+        strftime(buffer, sizeof(buffer), "%H:%M:%S", now);
+        sprintf(buffer, "[%s]\t%s\n", buffer, name);
+        SyscallList.emplace_back(buffer);
+//        ioHandler.WriteToReports(name);
 
         //add to map
         auto search = SyscallCounts.find(name);
@@ -111,7 +136,7 @@ bool dtraceHandler::InitDTrace(string targetName, string processID){
     if (strcmp(targetName.c_str(), "") != 0) {
         g_prog = "syscall:::entry /execname == \"" + targetName + "\"/ { }";
     } else if (processID.length() == 0) {
-        printf("Invalid arguments...");
+        std::cout << "Invalid arguments..." << std::endl;
         return -1;
     } else {
         g_prog = ID_SCRIPT + processID + ID_END;
@@ -127,18 +152,18 @@ bool dtraceHandler::InitDTrace(string targetName, string processID){
         fprintf(stderr, "failed to initialize dtrace: %s\n", dtrace_errmsg(nullptr, err));
         return false;
     }
-    printf("Dtrace initialized\n");
+    std::cout << "Dtrace initialized" << std::endl;
 
     (void) dtrace_setopt(d_handle, "bufsize", "4m");
     (void) dtrace_setopt(d_handle, "aggsize", "4m");
-    printf("dtrace options set\n");
+    std::cout << "dtrace options set" << std::endl;
 
     dtrace_prog_t *prog;
     if ((prog = dtrace_program_strcompile(d_handle, g_prog.c_str(), DTRACE_PROBESPEC_NAME, 0, 0, nullptr)) == nullptr) {
         fprintf(stderr, "failed to compile dtrace program\n");
         return false;
     } else {
-        printf("dtrace program compiled\n");
+        std::cout << "dtrace program compiled" << std::endl;
     }
 
     dtrace_proginfo_t info;
@@ -146,7 +171,7 @@ bool dtraceHandler::InitDTrace(string targetName, string processID){
         fprintf(stderr, "failed to enable dtrace probes\n");
         return false;
     } else {
-        printf("dtrace probes enabled\n");
+        std::cout << "dtrace probes enabled" << std::endl;
     }
 
     return true;
@@ -157,9 +182,8 @@ bool dtraceHandler::IsProcessRunning(){
 }
 
 bool dtraceHandler::StartDTrace(){
-
-    if (!test) {
-        return test;
+    if (!couldInit) {
+        return couldInit;
     }
 
     struct sigaction act;
@@ -174,7 +198,7 @@ bool dtraceHandler::StartDTrace(){
         return false;
     } else {
         ioHandler.OpenFile();
-        printf("instrumentation started and report file opened ..\n");
+        std::cout << "instrumentation started and report file opened..." << std::endl;
     }
 
     // Loop and chew
@@ -196,9 +220,6 @@ bool dtraceHandler::StartDTrace(){
             }
         }
 
-//        int (dtraceHandler::*func) (const dtrace_probedata_t*, const dtrace_recdesc_t*, void*);
-//        func = &dtraceHandler::chewrec;
-
         switch (dtrace_work(d_handle, stdout, nullptr, dtraceHandler::chewrec, nullptr)) {
             case DTRACE_WORKSTATUS_DONE:
                 done = 1;
@@ -213,7 +234,7 @@ bool dtraceHandler::StartDTrace(){
     } while (!done && isProcessRunning && duration < TIMEOUT_S);
 
     if (!isProcessRunning) {
-        printf("Target process has exited...\n");
+        std::cout <<"Target process has exited..." << std::endl;
     }
 
     if (duration >= TIMEOUT_S) {
@@ -223,11 +244,12 @@ bool dtraceHandler::StartDTrace(){
     return true;
 }
 
+//TODO: rename to Stop or something
 void dtraceHandler::Destroy(){
-    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-    printf("closing dtrace\n");
+    std::cout << "closing dtrace" << std::endl;
     dtrace_close(d_handle);
-    printf("closing dtruss\n");
+
+    std::cout << "closing dtruss" << std::endl;
     if (dtrussPid != -1) {
         kill(dtrussPid, SIGTERM);
     }

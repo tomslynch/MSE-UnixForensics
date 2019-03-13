@@ -10,6 +10,7 @@ static FILE *fp;
 string const IOHandler::DEFAULT_GROUP_PATH = "conf/groupInfo.txt"; //Add to a conf file later?
 map<string, int> IOHandler::groupMap;
 vector<string> IOHandler::groupNames;
+std::vector<IOHandler::SyscallData> IOHandler::dtrussSyscallList;
 
 IOHandler::IOHandler() = default;
 
@@ -25,7 +26,6 @@ IOHandler::IOHandler(string fn) {
     fp = nullptr;
 }
 
-//fputs("<<Syscalls>>\nDETAILED SECTION:\n", fp);
 void IOHandler::OpenFile(){
     fp = fopen(logFN.c_str(), "w+");
 }
@@ -35,11 +35,8 @@ void IOHandler::OpenFile(){
     std::time_t t = std::time(nullptr);   // get time now
     std::tm* now = std::localtime(&t);
     strftime(buffer, sizeof(buffer), "%H:%M:%S", now);
-//     std::cout << output << std::endl;
 
     fprintf(fp, "[%s]\t%s\n", buffer, output);
-//     std::cout << output << std::endl;
-
  }
 
 void IOHandler::Destroy() { // early march
@@ -63,20 +60,7 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
     return dst;
 }
 
- void IOHandler::WriteSummary(std::map <string, int> syscallCounts){
-    string summary = "\n************* SUMMARY *************\n";
-    fprintf(fp, "%s", summary.c_str());
-
-    std::multimap<int, string> SortedSyscallCounts = flip_map(syscallCounts);
-    for (auto const& x : SortedSyscallCounts)
-    {
-        fprintf(fp, "%s\t%s\n", std::to_string(x.first).c_str(), x.second.c_str());
-    }
-}
-
-
-////static TraceData ParseTraceLine(string line){
- void IOHandler::ParseTraceLine(string line){
+ IOHandler::SyscallData IOHandler::ParseTraceLine(string line){
     SyscallData sd;
     smatch m;
 
@@ -121,11 +105,26 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
             string tmp = m.str(0);
             string token;
             size_t pos;
-            while((pos = tmp.find(',')) != string::npos){
+
+            if (tmp[0] == '"' || tmp[0] == '\'') {
+                pos = tmp.find("\",");
+                pos = (pos == string::npos) ? string::npos : pos + 1;
+            } else {
+                pos = tmp.find(',');
+            }
+
+            while(pos != string::npos){
                 tmp.erase(0,1);
                 token = tmp.substr(0, pos-1);
                 sd.args.push_back(token);
                 tmp.erase(0, pos);
+
+                if (tmp[0] == '"' || (tmp.length() >= 2 && tmp[1] == '"')) {
+                    pos = tmp.find("\",");
+                    pos = (pos == string::npos) ? string::npos : pos + 1;
+                } else {
+                    pos = tmp.find(',');
+                }
             }
             tmp.erase(0,1);
             tmp.erase(tmp.length()-1, tmp.length());
@@ -133,16 +132,17 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
         }
 
         //grab return info
-        regex returnPattern("=.*$");
+        regex returnPattern("\\)\t\t =.*$");
         if (regex_search(line, m, returnPattern)) {
             match = m.str(0);
-            match = match.substr(2, match.length());
+            match = match.substr(6, match.length());
             sd.ret = match.substr(0, match.find(' '));
             sd.retDesc = match.substr(match.find(' ')+1, (match.length()-1) - match.find(' '));
         }
 
-        cout << sd.toString() << endl;
+//        cout << sd.toString() << endl;
     }
+    return sd;
 }
 
  void IOHandler::ParseTraceFile(){
@@ -152,21 +152,104 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
     {
         while (getline(myfile, line))
         {
-            ParseTraceLine(line);
+            IOHandler::dtrussSyscallList.push_back(ParseTraceLine(line));
         }
         myfile.close();
     } else {
-        cout << "Unable to open file\n";
+        cout << "Unable to open file" << endl;
     }
 }
 
-void IOHandler::ReadInGroups(string filepath){
-    cout << "Reading in grouping file..." << endl;
-    if(filepath == ""){
-        filepath = DEFAULT_GROUP_PATH;
+string IOHandler::GetTotalCPUTime() {
+    long totalMS = 0;
+    for (int i = 0; i < dtrussSyscallList.size(); i++) {
+        if (!dtrussSyscallList[i].cpuTime.empty() ||
+        (i == dtrussSyscallList.size()-1 && dtrussSyscallList[i].name != "thread_selfid")){
+            totalMS += stol(dtrussSyscallList[i].cpuTime);
+        }
     }
 
-    cout << filepath << endl;
+    return to_string(totalMS/60);
+}
+
+void IOHandler::WriteHeader(string targetName,
+        std::chrono::steady_clock::time_point targetStart,
+        std::chrono::steady_clock::time_point progStart) {
+    auto end = chrono::steady_clock::now();
+    fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
+    fprintf(fp, "\nMonitoring Tool created by UW-L MSE Student, Thomas Lynch\n");
+    fprintf(fp, "Targeted Process:\t\t%s\n", targetName.c_str());
+    fprintf(fp, "Total Monitored Time:\t\t%lld seconds\n",
+            chrono::duration_cast<chrono::seconds>(end-progStart).count());
+    fprintf(fp, "Total Target Elapsed Time:\t%lld seconds\n",
+            chrono::duration_cast<chrono::seconds>(end-targetStart).count());
+    fprintf(fp, "Total Target CPU Time:\t\t%s microseconds\n", GetTotalCPUTime().c_str());
+    fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
+    fprintf(fp, "\n");
+}
+
+void IOHandler::WriteSummary(std::map<string, int> syscallCounts) {
+    fprintf(fp, "%s", "\n************* SUMMARY *************\n");
+
+    std::multimap<int, string> SortedSyscallCounts = flip_map(syscallCounts);
+    for (auto const& x : SortedSyscallCounts)
+    {
+        fprintf(fp, "%s\t%s\n", std::to_string(x.first).c_str(), x.second.c_str());
+    }
+}
+
+void IOHandler::WriteDTraceList(std::vector<string> syscallList) {
+    fprintf(fp, "%s", "\n************* DTrace Syscall List *************\n");
+    for (int i = 0; i < syscallList.size(); i++) {
+        fprintf(fp, "%s", syscallList[i].c_str());
+    }
+}
+
+void IOHandler::WriteDTrussList() {
+    fprintf(fp, "%s", "\n************* DTruss Basic Syscall List *************\n");
+    string tmp;
+    for (int i = 0; i < dtrussSyscallList.size(); i++) {
+        tmp = dtrussSyscallList[i].name + "(";
+        for (int j = 0; j < dtrussSyscallList[i].args.size(); j++) {
+            if (j == dtrussSyscallList[i].args.size()-1) {
+                tmp += dtrussSyscallList[i].args[j] + ")";
+            } else {
+                tmp += dtrussSyscallList[i].args[j] + ", ";
+            }
+        }
+        fprintf(fp, "%s\n", tmp.c_str());
+    }
+
+    fprintf(fp, "%s", "\n************* DTruss Detailed Syscall List *************\n");
+    for (int i = 0; i < dtrussSyscallList.size(); i++) {
+        fprintf(fp, "%s\n", dtrussSyscallList[i].toString().c_str());
+    }
+}
+
+void IOHandler::GenerateReport( string targetName,
+        std::map<string, int> syscallCounts,
+        std::vector<string> syscallList,
+        std::chrono::steady_clock::time_point targetStart,
+        std::chrono::steady_clock::time_point progStart){
+    //TODO: write all filepaths
+    //TODO: add error info
+    //TODO: write all errored syscalls
+    //TODO: write number of children
+    //TODO: create tree structure with children
+    ParseTraceFile();
+    WriteHeader(targetName, targetStart, progStart);
+    WriteSummary(syscallCounts);
+    WriteDTraceList(syscallList);
+    WriteDTrussList();
+    fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
+    fprintf(fp, "\n");
+}
+
+void IOHandler::ReadInGroups(string filepath){
+    if(filepath.empty()){
+        filepath = DEFAULT_GROUP_PATH;
+    }
+    cout << "Reading in grouping file..." << filepath.c_str() << endl;
 
     ifstream file(filepath.c_str());
     int idx = 0;
