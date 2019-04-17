@@ -7,14 +7,18 @@ using namespace std;
 
 //string filename;
 static FILE *fp;
-string const IOHandler::DEFAULT_GROUP_PATH = "conf/groupInfo.txt"; //Add to a conf file later?
-map<string, int> IOHandler::groupMap;
-vector<string> IOHandler::groupNames;
-std::vector<IOHandler::SyscallData> IOHandler::dtrussSyscallList;
+ //Add to a conf file later?
+
+string& IOHandler::getDefaultGroupPath(){
+    static string DEFAULT_GROUP_PATH = "conf/groupInfo.txt";
+    return DEFAULT_GROUP_PATH;
+}
+std::map<string, int> IOHandler::groupMap;
+std::vector<string> IOHandler::groupNames;
 
 IOHandler::IOHandler() = default;
 
-IOHandler::IOHandler(string fn) {
+IOHandler::IOHandler(const string& fn) {
     if (fn.length() == 0) {
         time_t t = time(nullptr);
         auto intNow = static_cast<long int> (t);
@@ -39,7 +43,7 @@ void IOHandler::OpenFile(){
     fprintf(fp, "[%s]\t%s\n", buffer, output);
  }
 
-void IOHandler::Destroy() { // early march
+void IOHandler::Destroy() {
     if (fp != nullptr) {
         fclose(fp);
     }
@@ -60,7 +64,7 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
     return dst;
 }
 
- IOHandler::SyscallData IOHandler::ParseTraceLine(string line){
+ IOHandler::SyscallData IOHandler::ParseTraceLine(string& line){
     SyscallData sd;
     smatch m;
 
@@ -86,8 +90,12 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
                     break;
                 case 1:
                     ssin >> sd.elapsedTime;
+                    break;
                 case 2:
                     ssin >> sd.cpuTime;
+                    break;
+                default:
+                    break;
             }
             ++i;
         }
@@ -172,23 +180,23 @@ string IOHandler::GetTotalCPUTime() {
     return to_string(totalMS/60);
 }
 
-void IOHandler::WriteHeader(string targetName,
+void IOHandler::WriteHeader(string& targetName,
         std::chrono::steady_clock::time_point targetStart,
         std::chrono::steady_clock::time_point progStart) {
     auto end = chrono::steady_clock::now();
     fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
     fprintf(fp, "\nMonitoring Tool created by UW-L MSE Student, Thomas Lynch\n");
     fprintf(fp, "Targeted Process:\t\t%s\n", targetName.c_str());
-    fprintf(fp, "Total Monitored Time:\t\t%lld seconds\n",
+    fprintf(fp, "Total Monitored Time:\t\t%ld seconds\n",
             chrono::duration_cast<chrono::seconds>(end-progStart).count());
-    fprintf(fp, "Total Target Elapsed Time:\t%lld seconds\n",
+    fprintf(fp, "Total Target Elapsed Time:\t%ld seconds\n",
             chrono::duration_cast<chrono::seconds>(end-targetStart).count());
     fprintf(fp, "Total Target CPU Time:\t\t%s microseconds\n", GetTotalCPUTime().c_str());
     fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
     fprintf(fp, "\n");
 }
 
-void IOHandler::WriteSummary(std::map<string, int> syscallCounts) {
+void IOHandler::WriteSummary(std::map<string, int>& syscallCounts) {
     fprintf(fp, "%s", "\n************* SUMMARY *************\n");
 
     std::multimap<int, string> SortedSyscallCounts = flip_map(syscallCounts);
@@ -198,31 +206,31 @@ void IOHandler::WriteSummary(std::map<string, int> syscallCounts) {
     }
 }
 
-void IOHandler::WriteDTraceList(std::vector<string> syscallList) {
+void IOHandler::WriteDTraceList(std::vector<string>& syscallList) {
     fprintf(fp, "%s", "\n************* DTrace Syscall List *************\n");
-    for (int i = 0; i < syscallList.size(); i++) {
-        fprintf(fp, "%s", syscallList[i].c_str());
+    for (auto& syscall: syscallList) {
+        fprintf(fp, "%s", syscall.c_str());
     }
 }
 
 void IOHandler::WriteDTrussList() {
     fprintf(fp, "%s", "\n************* DTruss Basic Syscall List *************\n");
     string tmp;
-    for (int i = 0; i < dtrussSyscallList.size(); i++) {
-        tmp = dtrussSyscallList[i].name + "(";
-        for (int j = 0; j < dtrussSyscallList[i].args.size(); j++) {
-            if (j == dtrussSyscallList[i].args.size()-1) {
-                tmp += dtrussSyscallList[i].args[j] + ")";
+    for (auto& dtrussSyscall : dtrussSyscallList) {
+        tmp = dtrussSyscall.name + "(";
+        for (int i = 0; i < dtrussSyscall.args.size(); i++) {
+            if (i == dtrussSyscall.args.size()-1) {
+                tmp += dtrussSyscall.args[i] + ")";
             } else {
-                tmp += dtrussSyscallList[i].args[j] + ", ";
+                tmp += dtrussSyscall.args[i] + ", ";
             }
         }
         fprintf(fp, "%s\n", tmp.c_str());
     }
 
     fprintf(fp, "%s", "\n************* DTruss Detailed Syscall List *************\n");
-    for (int i = 0; i < dtrussSyscallList.size(); i++) {
-        fprintf(fp, "%s\n", dtrussSyscallList[i].toString().c_str());
+    for (auto& dtrussSyscall : dtrussSyscallList) {
+        fprintf(fp, "%s\n", dtrussSyscall.toString().c_str());
     }
 }
 
@@ -247,7 +255,7 @@ void IOHandler::GenerateReport( string targetName,
 
 void IOHandler::ReadInGroups(string filepath){
     if(filepath.empty()){
-        filepath = DEFAULT_GROUP_PATH;
+        filepath = getDefaultGroupPath();
     }
     cout << "Reading in grouping file..." << filepath.c_str() << endl;
 
@@ -260,31 +268,23 @@ void IOHandler::ReadInGroups(string filepath){
 
         if (getline(ss, line, ',')) {
             groupNames.push_back(line);
-
-            while(getline(ss, line, ',')){
-                tmp = "";
-                line.erase(0,1);
-                for (int i = 0; i < line.size(); i++){
-                    tmp += tolower(line[i]);
-                }
-
-                groupMap.insert({tmp, idx});
-            }
+            std::transform (line.begin(), line.end(), line.begin(), ::tolower);
+            groupMap.insert({line, idx});
         }
         idx++;
     }
 }
 
-string IOHandler::GetGroup(string syscall){
+string IOHandler::GetGroup(string& syscall){
     if (groupMap.find(syscall) != groupMap.end()) {
-        return groupNames[groupMap[syscall]];
+        return IOHandler::groupNames[groupMap[syscall]];
     } else {
         return "UNKNOWN";
     }
 }
 
-void IOHandler::DEBUGPrintVector(vector<string> v){
-    for (int i = 0; i < v.size(); i++) {
-        cout << v[i] << endl;
+void IOHandler::DEBUGPrintVector(vector<string>& v){
+    for (auto& c : v) {
+        cout << c << endl;
     }
 }

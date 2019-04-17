@@ -39,19 +39,19 @@ cmake_force:
 SHELL = /bin/sh
 
 # The CMake executable.
-CMAKE_COMMAND = /usr/local/Cellar/cmake/3.13.4/bin/cmake
+CMAKE_COMMAND = /usr/bin/cmake3
 
 # The command to remove a file.
-RM = /usr/local/Cellar/cmake/3.13.4/bin/cmake -E remove -f
+RM = /usr/bin/cmake3 -E remove -f
 
 # Escaping for special characters.
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/thomaslynch/CLionProjects/DTraceConsumer
+CMAKE_SOURCE_DIR = /home/thomaslynch/CLionProjects/MSE-UnixForensics
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/thomaslynch/CLionProjects/DTraceConsumer
+CMAKE_BINARY_DIR = /home/thomaslynch/CLionProjects/MSE-UnixForensics
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -59,7 +59,7 @@ CMAKE_BINARY_DIR = /Users/thomaslynch/CLionProjects/DTraceConsumer
 # Special rule for the target rebuild_cache
 rebuild_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
-	/usr/local/Cellar/cmake/3.13.4/bin/cmake -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
+	/usr/bin/cmake3 -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : rebuild_cache
 
 # Special rule for the target rebuild_cache
@@ -70,7 +70,7 @@ rebuild_cache/fast: rebuild_cache
 # Special rule for the target edit_cache
 edit_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake cache editor..."
-	/usr/local/Cellar/cmake/3.13.4/bin/ccmake -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
+	/usr/bin/ccmake -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : edit_cache
 
 # Special rule for the target edit_cache
@@ -80,9 +80,9 @@ edit_cache/fast: edit_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/thomaslynch/CLionProjects/DTraceConsumer/CMakeFiles /Users/thomaslynch/CLionProjects/DTraceConsumer/CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/thomaslynch/CLionProjects/MSE-UnixForensics/CMakeFiles /home/thomaslynch/CLionProjects/MSE-UnixForensics/CMakeFiles/progress.marks
 	$(MAKE) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/thomaslynch/CLionProjects/DTraceConsumer/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/thomaslynch/CLionProjects/MSE-UnixForensics/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -111,19 +111,6 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named HelloWorldTest
-
-# Build rule for target.
-HelloWorldTest: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 HelloWorldTest
-.PHONY : HelloWorldTest
-
-# fast build rule for target.
-HelloWorldTest/fast:
-	$(MAKE) -f CMakeFiles/HelloWorldTest.dir/build.make CMakeFiles/HelloWorldTest.dir/build
-.PHONY : HelloWorldTest/fast
-
-#=============================================================================
 # Target rules for targets named BasicForkTest
 
 # Build rule for target.
@@ -150,17 +137,30 @@ ReadFileTest/fast:
 .PHONY : ReadFileTest/fast
 
 #=============================================================================
-# Target rules for targets named DTraceConsumer
+# Target rules for targets named HelloWorldTest
 
 # Build rule for target.
-DTraceConsumer: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 DTraceConsumer
-.PHONY : DTraceConsumer
+HelloWorldTest: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 HelloWorldTest
+.PHONY : HelloWorldTest
 
 # fast build rule for target.
-DTraceConsumer/fast:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/build
-.PHONY : DTraceConsumer/fast
+HelloWorldTest/fast:
+	$(MAKE) -f CMakeFiles/HelloWorldTest.dir/build.make CMakeFiles/HelloWorldTest.dir/build
+.PHONY : HelloWorldTest/fast
+
+#=============================================================================
+# Target rules for targets named STraceConsumer
+
+# Build rule for target.
+STraceConsumer: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 STraceConsumer
+.PHONY : STraceConsumer
+
+# fast build rule for target.
+STraceConsumer/fast:
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/build
+.PHONY : STraceConsumer/fast
 
 IOHandler.o: IOHandler.cpp.o
 
@@ -168,7 +168,7 @@ IOHandler.o: IOHandler.cpp.o
 
 # target to build an object file
 IOHandler.cpp.o:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/IOHandler.cpp.o
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/IOHandler.cpp.o
 .PHONY : IOHandler.cpp.o
 
 IOHandler.i: IOHandler.cpp.i
@@ -177,7 +177,7 @@ IOHandler.i: IOHandler.cpp.i
 
 # target to preprocess a source file
 IOHandler.cpp.i:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/IOHandler.cpp.i
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/IOHandler.cpp.i
 .PHONY : IOHandler.cpp.i
 
 IOHandler.s: IOHandler.cpp.s
@@ -186,35 +186,8 @@ IOHandler.s: IOHandler.cpp.s
 
 # target to generate assembly for a file
 IOHandler.cpp.s:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/IOHandler.cpp.s
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/IOHandler.cpp.s
 .PHONY : IOHandler.cpp.s
-
-dtraceHandler.o: dtraceHandler.cpp.o
-
-.PHONY : dtraceHandler.o
-
-# target to build an object file
-dtraceHandler.cpp.o:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/dtraceHandler.cpp.o
-.PHONY : dtraceHandler.cpp.o
-
-dtraceHandler.i: dtraceHandler.cpp.i
-
-.PHONY : dtraceHandler.i
-
-# target to preprocess a source file
-dtraceHandler.cpp.i:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/dtraceHandler.cpp.i
-.PHONY : dtraceHandler.cpp.i
-
-dtraceHandler.s: dtraceHandler.cpp.s
-
-.PHONY : dtraceHandler.s
-
-# target to generate assembly for a file
-dtraceHandler.cpp.s:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/dtraceHandler.cpp.s
-.PHONY : dtraceHandler.cpp.s
 
 main.o: main.cpp.o
 
@@ -222,7 +195,7 @@ main.o: main.cpp.o
 
 # target to build an object file
 main.cpp.o:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/main.cpp.o
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/main.cpp.o
 .PHONY : main.cpp.o
 
 main.i: main.cpp.i
@@ -231,7 +204,7 @@ main.i: main.cpp.i
 
 # target to preprocess a source file
 main.cpp.i:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/main.cpp.i
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/main.cpp.i
 .PHONY : main.cpp.i
 
 main.s: main.cpp.s
@@ -240,8 +213,35 @@ main.s: main.cpp.s
 
 # target to generate assembly for a file
 main.cpp.s:
-	$(MAKE) -f CMakeFiles/DTraceConsumer.dir/build.make CMakeFiles/DTraceConsumer.dir/main.cpp.s
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/main.cpp.s
 .PHONY : main.cpp.s
+
+straceHandler.o: straceHandler.cpp.o
+
+.PHONY : straceHandler.o
+
+# target to build an object file
+straceHandler.cpp.o:
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/straceHandler.cpp.o
+.PHONY : straceHandler.cpp.o
+
+straceHandler.i: straceHandler.cpp.i
+
+.PHONY : straceHandler.i
+
+# target to preprocess a source file
+straceHandler.cpp.i:
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/straceHandler.cpp.i
+.PHONY : straceHandler.cpp.i
+
+straceHandler.s: straceHandler.cpp.s
+
+.PHONY : straceHandler.s
+
+# target to generate assembly for a file
+straceHandler.cpp.s:
+	$(MAKE) -f CMakeFiles/STraceConsumer.dir/build.make CMakeFiles/STraceConsumer.dir/straceHandler.cpp.s
+.PHONY : straceHandler.cpp.s
 
 tests/BasicForkTest.o: tests/BasicForkTest.cpp.o
 
@@ -332,19 +332,19 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
-	@echo "... HelloWorldTest"
 	@echo "... BasicForkTest"
 	@echo "... ReadFileTest"
-	@echo "... DTraceConsumer"
+	@echo "... HelloWorldTest"
+	@echo "... STraceConsumer"
 	@echo "... IOHandler.o"
 	@echo "... IOHandler.i"
 	@echo "... IOHandler.s"
-	@echo "... dtraceHandler.o"
-	@echo "... dtraceHandler.i"
-	@echo "... dtraceHandler.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... straceHandler.o"
+	@echo "... straceHandler.i"
+	@echo "... straceHandler.s"
 	@echo "... tests/BasicForkTest.o"
 	@echo "... tests/BasicForkTest.i"
 	@echo "... tests/BasicForkTest.s"

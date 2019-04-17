@@ -2,8 +2,12 @@
 #include <assert.h>
 #include <string>
 #include <zconf.h>
+#include <cstring>
+#include <chrono>
+#include <thread>
+#include <wait.h>
 
-#include "dtraceHandler.h"
+#include "straceHandler.h"
 #include "IOHandler.h"
 
 using namespace std;
@@ -33,22 +37,11 @@ int main (int argc, char** argv) {
     ioHandler.ReadInGroups("");
 
     // Start DTrace and Dtruss
-    dtraceHandler dtHandle = dtraceHandler(targetName, processID, ioHandler);
-    if (dtHandle.StartDTrace()) {
+    straceHandler stHandle = straceHandler();
+    stHandle.StartStraceProcess(processID);
 
-        //TODO: optimize - this is in place to prevent conflicts when looking at trace file
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        dtHandle.Destroy();
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-        string target = (targetName.empty()) ? processID : targetName;
-        ioHandler.GenerateReport( target,
-                dtHandle.GetSyscallCounts(),
-                dtHandle.GetSyscallList(),
-                dtHandle.GetTargetStart(),
-                progStart);
-    }
-
+    int status;
+    waitpid(stHandle.getPid(), &status, 0);
     ioHandler.Destroy();
     return 0;
 }

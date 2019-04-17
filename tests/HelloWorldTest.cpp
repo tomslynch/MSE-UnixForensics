@@ -5,7 +5,8 @@
 #include <iostream>
 #include <cstdio>
 #include <zconf.h>
-#include <cstdint>
+#include <stdio.h>
+#include <stdint.h>
 using namespace std;
 
 int main(){
