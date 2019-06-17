@@ -1,6 +1,4 @@
-//
-// Created by Thomas Lynch on 2/8/19.
-//
+#include <sys/stat.h>
 #include "IOHandler.h"
 
 using namespace std;
@@ -19,6 +17,12 @@ std::vector<string> IOHandler::groupNames;
 IOHandler::IOHandler() = default;
 
 IOHandler::IOHandler(const string& fn) {
+    // Init directories
+    // TODO: use constants
+    mkdir("reports", S_IRWXU);
+    mkdir("tmp", S_IRWXU);
+    mkdir("conf", S_IRWXU);
+
     if (fn.length() == 0) {
         time_t t = time(nullptr);
         auto intNow = static_cast<long int> (t);
@@ -64,105 +68,130 @@ std::multimap<B,A> flip_map(const std::map<A,B> &src)
     return dst;
 }
 
- IOHandler::SyscallData IOHandler::ParseTraceLine(string& line){
-    SyscallData sd;
-    smatch m;
-
-    // grab pid and tid
-    regex pidPattern("^.*:");
-    string match;
-    if (regex_search(line, m, pidPattern)) {
-        match = m.str(0);
-        sd.pid = match.substr(0, match.find('/'));
-        sd.tid = match.substr(match.find('/')+1, (match.length()-2) - match.find('/'));
-    }
-
-    //grab times
-    regex timePattern("(\\d+\\s+){3}");
-    if (regex_search(line, m, timePattern)) {
-        match = m.str(0);
-        stringstream ssin(match);
-        int i = 0;
-        while (ssin.good() && i < 3){
-            switch (i) {
-                case 0:
-                    ssin >> sd.relTime;
-                    break;
-                case 1:
-                    ssin >> sd.elapsedTime;
-                    break;
-                case 2:
-                    ssin >> sd.cpuTime;
-                    break;
-                default:
-                    break;
-            }
-            ++i;
-        }
-    }
-
-    //grab syscall
-    regex syscallPattern("[^-\\s]*\\(.*=");
-    if (regex_search(line, m, syscallPattern)) {
-        match = m.str(0);
-        sd.name = match.substr(0, match.find('('));
-
-        //grab args
-        regex argR("\\(.*\\)");
-        if (regex_search(match, m, argR)) {
-            string tmp = m.str(0);
-            string token;
-            size_t pos;
-
-            if (tmp[0] == '"' || tmp[0] == '\'') {
-                pos = tmp.find("\",");
-                pos = (pos == string::npos) ? string::npos : pos + 1;
-            } else {
-                pos = tmp.find(',');
-            }
-
-            while(pos != string::npos){
-                tmp.erase(0,1);
-                token = tmp.substr(0, pos-1);
-                sd.args.push_back(token);
-                tmp.erase(0, pos);
-
-                if (tmp[0] == '"' || (tmp.length() >= 2 && tmp[1] == '"')) {
-                    pos = tmp.find("\",");
-                    pos = (pos == string::npos) ? string::npos : pos + 1;
-                } else {
-                    pos = tmp.find(',');
-                }
-            }
-            tmp.erase(0,1);
-            tmp.erase(tmp.length()-1, tmp.length());
-            sd.args.push_back(tmp);
+vector<string> ParseArgs(string line){
+    //TODO: replace with stream?
+    vector<string> args;
+    string arg;
+    while (!line.empty() && line[0] != ' ') {
+        arg = "";
+        if (line[0] == '{') {
+            arg = line.substr(0, line.find('}')+1);
+            line.erase(0, line.find('}')+1);
+        } else if (line[0] == '"') {
+            arg += "\"";
+            line.erase(0,1);
+            arg += line.substr(0, line.find('"')+1);
+            line.erase(0, line.find('"')+1);
+        } else {
+            arg = line.substr(0,line.find(','));
+            line.erase(0, line.find(','));
         }
 
-        //grab return info
-        regex returnPattern("\\)\t\t =.*$");
-        if (regex_search(line, m, returnPattern)) {
-            match = m.str(0);
-            match = match.substr(6, match.length());
-            sd.ret = match.substr(0, match.find(' '));
-            sd.retDesc = match.substr(match.find(' ')+1, (match.length()-1) - match.find(' '));
+        args.push_back(arg);
+        //remove comma and space
+        if (!line.empty() && line[0] == ',') {
+            line.erase(0, 2);
         }
-
-//        cout << sd.toString() << endl;
     }
-    return sd;
+    return args;
 }
 
- void IOHandler::ParseTraceFile(){
-    string line;
-    ifstream myfile ("trace");
-    if (myfile.is_open())
-    {
-        while (getline(myfile, line))
-        {
-            IOHandler::dtrussSyscallList.push_back(ParseTraceLine(line));
+ IOHandler::SyscallData IOHandler::ParseTraceLine(string& line){
+     SyscallData sd;
+     smatch m;
+
+     // grab pid and tid
+     sd.pid = line.substr(0, line.find(' '));
+     line.erase(0, line.find(':')-2);
+
+     sd.timestamp = line.substr(0, line.find(' '));
+     line.erase(0, line.find(' ')+1);
+
+     if (line[0] == '<') {
+         // resumed statement
+         sd.name = "resumed";
+         line.erase(0, line.find('>')+2);
+         sd.args = ParseArgs(line.substr(0, line.find_last_of(')')));
+
+         // grab return code and cpuTime
+         line.erase(0, line.find('=')+2);
+         sd.ret = line.substr(0, line.find(' '));
+         line.erase(0, line.find(' ')+1);
+         sd.retDesc = line.substr(0, line.find('<')); // may be empty
+         line.erase(0,line.find('<')+1);
+         sd.cpuTime = line.substr(0, line.find('>'));
+     } else if (line[0] == '+') {
+         // TODO: does exited with == exit/exit_group argument?
+         // exit statement
+         sd.name = "Exited with";
+         line.erase(0, line.find("with")+5);
+         sd.ret = line.substr(0, line.find(' '));
+     } else {
+         // syscall start
+         if (line.find("<unfinished ...>") == string::npos) {
+             // full syscall
+             // ')' seems to be a safe delimiter
+             sd.name = line.substr(0, line.find('('));
+             line.erase(0, line.find('(')+1);
+             sd.args = ParseArgs(line.substr(0,line.find_last_of(')')));
+             line.erase(0, line.find_last_of(')'));
+
+             // grab return code and cpuTime
+             line.erase(0, line.find('=')+2);
+             sd.ret = line.substr(0, line.find(' '));
+
+             // '?' return can occur on exit
+             if (sd.ret != "?") {
+                 line.erase(0, line.find(' ')+1);
+                 sd.retDesc = line.substr(0, line.find('<')); // may be empty
+                 line.erase(0,line.find('<')+1);
+                 sd.cpuTime = line.substr(0, line.find('>'));
+             }
+         } else {
+             // unfinished syscall
+             // ')' seems to be a safe delimiter
+             sd.name = line.substr(0, line.find('('));
+             line.erase(0, line.find('(')+1);
+             sd.args = ParseArgs(line.substr(0,line.find('<')-1));
+         }
+     }
+     return sd;
+}
+
+int GetLastSyscallIDXFromPid(vector<IOHandler::SyscallData> list, string& pid){
+    for (int i = list.size()-1; i >= 0; i--) {
+        if (list[i].pid == pid) {
+            return i;
         }
-        myfile.close();
+    }
+}
+
+void AppendSyscall(IOHandler::SyscallData& start, IOHandler::SyscallData end){
+    for(auto const& arg : end.args){
+        start.args.push_back(arg);
+    }
+    start.ret = end.ret;
+    start.retDesc = end.retDesc;
+}
+
+ void IOHandler::ParseTraceFile(const string& filepath){
+    string line;
+    ifstream traceFile (filepath);
+    if (traceFile.is_open())
+    {
+        SyscallData tmp;
+        while (getline(traceFile, line))
+        {
+            tmp = ParseTraceLine(line);
+            if (tmp.name == "resumed") {
+                AppendSyscall(
+                        IOHandler::dtrussSyscallList[GetLastSyscallIDXFromPid(IOHandler::dtrussSyscallList, tmp.pid)],
+                        tmp);
+            } else {
+                IOHandler::dtrussSyscallList.push_back(tmp);
+            }
+        }
+        traceFile.close();
     } else {
         cout << "Unable to open file" << endl;
     }
@@ -180,79 +209,6 @@ string IOHandler::GetTotalCPUTime() {
     return to_string(totalMS/60);
 }
 
-void IOHandler::WriteHeader(string& targetName,
-        std::chrono::steady_clock::time_point targetStart,
-        std::chrono::steady_clock::time_point progStart) {
-    auto end = chrono::steady_clock::now();
-    fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
-    fprintf(fp, "\nMonitoring Tool created by UW-L MSE Student, Thomas Lynch\n");
-    fprintf(fp, "Targeted Process:\t\t%s\n", targetName.c_str());
-    fprintf(fp, "Total Monitored Time:\t\t%ld seconds\n",
-            chrono::duration_cast<chrono::seconds>(end-progStart).count());
-    fprintf(fp, "Total Target Elapsed Time:\t%ld seconds\n",
-            chrono::duration_cast<chrono::seconds>(end-targetStart).count());
-    fprintf(fp, "Total Target CPU Time:\t\t%s microseconds\n", GetTotalCPUTime().c_str());
-    fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
-    fprintf(fp, "\n");
-}
-
-void IOHandler::WriteSummary(std::map<string, int>& syscallCounts) {
-    fprintf(fp, "%s", "\n************* SUMMARY *************\n");
-
-    std::multimap<int, string> SortedSyscallCounts = flip_map(syscallCounts);
-    for (auto const& x : SortedSyscallCounts)
-    {
-        fprintf(fp, "%s\t%s\n", std::to_string(x.first).c_str(), x.second.c_str());
-    }
-}
-
-void IOHandler::WriteDTraceList(std::vector<string>& syscallList) {
-    fprintf(fp, "%s", "\n************* DTrace Syscall List *************\n");
-    for (auto& syscall: syscallList) {
-        fprintf(fp, "%s", syscall.c_str());
-    }
-}
-
-void IOHandler::WriteDTrussList() {
-    fprintf(fp, "%s", "\n************* DTruss Basic Syscall List *************\n");
-    string tmp;
-    for (auto& dtrussSyscall : dtrussSyscallList) {
-        tmp = dtrussSyscall.name + "(";
-        for (int i = 0; i < dtrussSyscall.args.size(); i++) {
-            if (i == dtrussSyscall.args.size()-1) {
-                tmp += dtrussSyscall.args[i] + ")";
-            } else {
-                tmp += dtrussSyscall.args[i] + ", ";
-            }
-        }
-        fprintf(fp, "%s\n", tmp.c_str());
-    }
-
-    fprintf(fp, "%s", "\n************* DTruss Detailed Syscall List *************\n");
-    for (auto& dtrussSyscall : dtrussSyscallList) {
-        fprintf(fp, "%s\n", dtrussSyscall.toString().c_str());
-    }
-}
-
-void IOHandler::GenerateReport( string targetName,
-        std::map<string, int> syscallCounts,
-        std::vector<string> syscallList,
-        std::chrono::steady_clock::time_point targetStart,
-        std::chrono::steady_clock::time_point progStart){
-    //TODO: write all filepaths
-    //TODO: add error info
-    //TODO: write all errored syscalls
-    //TODO: write number of children
-    //TODO: create tree structure with children
-    ParseTraceFile();
-    WriteHeader(targetName, targetStart, progStart);
-    WriteSummary(syscallCounts);
-    WriteDTraceList(syscallList);
-    WriteDTrussList();
-    fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
-    fprintf(fp, "\n");
-}
-
 void IOHandler::ReadInGroups(string filepath){
     if(filepath.empty()){
         filepath = getDefaultGroupPath();
@@ -265,10 +221,10 @@ void IOHandler::ReadInGroups(string filepath){
     string line;
     while(getline(file, line)){
         istringstream ss(line);
-
-        if (getline(ss, line, ',')) {
-            groupNames.push_back(line);
+        groupNames.push_back(line.substr(0, line.find(',')));
+        while (getline(ss, line, ',')) {
             std::transform (line.begin(), line.end(), line.begin(), ::tolower);
+            line.erase(0,1);
             groupMap.insert({line, idx});
         }
         idx++;
@@ -287,4 +243,67 @@ void IOHandler::DEBUGPrintVector(vector<string>& v){
     for (auto& c : v) {
         cout << c << endl;
     }
+}
+
+void IOHandler::WriteHeader(string& targetName,
+                            std::chrono::steady_clock::time_point targetStart) {
+    auto end = chrono::steady_clock::now();
+    fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
+    fprintf(fp, "\nMonitoring Tool created by UW-L MSE Student, Thomas Lynch\n");
+    fprintf(fp, "Targeted Process:\t\t%s\n", targetName.c_str());
+    fprintf(fp, "Total Monitored Time:\t\t%ld seconds\n",
+            chrono::duration_cast<chrono::seconds>(end-targetStart).count());
+//    fprintf(fp, "Total Target Elapsed Time:\t%ld seconds\n",
+//            chrono::duration_cast<chrono::seconds>(end-targetStart).count());
+//    fprintf(fp, "Total Target CPU Time:\t\t%s microseconds\n", GetTotalCPUTime().c_str());
+    fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
+    fprintf(fp, "\n");
+}
+
+void IOHandler::WriteSummary(std::map<string, int>& syscallCounts) {
+    fprintf(fp, "%s", "\n************* SUMMARY *************\n");
+
+    std::multimap<int, string> SortedSyscallCounts = flip_map(syscallCounts);
+    for (auto const& x : SortedSyscallCounts)
+    {
+        fprintf(fp, "%s\t%s\n", std::to_string(x.first).c_str(), x.second.c_str());
+    }
+}
+
+void IOHandler::WriteDTrussList() {
+    fprintf(fp, "%s", "\n************* STrace Basic Syscall List *************\n");
+    string tmp;
+    for (auto& dtrussSyscall : dtrussSyscallList) {
+        tmp = dtrussSyscall.name + "(";
+        for (int i = 0; i < dtrussSyscall.args.size(); i++) {
+            if (i == dtrussSyscall.args.size()-1) {
+                tmp += dtrussSyscall.args[i] + ")";
+            } else {
+                tmp += dtrussSyscall.args[i] + ", ";
+            }
+        }
+        fprintf(fp, "%s\n", tmp.c_str());
+    }
+
+    fprintf(fp, "%s", "\n************* STrace Detailed Syscall List *************\n");
+    for (auto& dtrussSyscall : dtrussSyscallList) {
+        fprintf(fp, "%s\n", dtrussSyscall.toStringCompact().c_str());
+    }
+}
+
+void IOHandler::GenerateReport( const string& reportName,
+                                string targetName,
+                                std::chrono::steady_clock::time_point targetStart){
+    //TODO: write all filepaths
+    //TODO: add error info
+    //TODO: write all errored syscalls
+    //TODO: write number of children
+    //TODO: create tree structure with children
+    ParseTraceFile(reportName);
+    OpenFile();
+    WriteHeader(targetName, targetStart);
+//    WriteSummary(syscallCounts);
+    WriteDTrussList();
+    fprintf(fp, "%.*s", 80, "#######################################################################################################################################");
+    fprintf(fp, "\n");
 }

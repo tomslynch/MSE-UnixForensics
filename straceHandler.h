@@ -1,11 +1,7 @@
-//
-// Created by thomaslynch on 4/9/19.
-//
+#ifndef STRACECONSUMER_STRACEHANDLER_H
+#define STRACECONSUMER_STRACEHANDLER_H
 
-#ifndef DTRACECONSUMER_STRACEHANDLER_H
-#define DTRACECONSUMER_STRACEHANDLER_H
-
-#include <stdio.h>
+#include <cstdio>
 #include <string>
 #include <zconf.h>
 #include <ctime>
@@ -22,7 +18,8 @@ using std::to_string;
 class straceHandler {
 public:
     straceHandler();
-    void StartStraceProcess(const string& processID);
+    void StartStraceProcess(const string& processID, const string& reportName);
+    void StartStracePath(const string& path, const string& reportName);
     const string &getFn() const;
     void setFn(const string &fn);
     int getPid() const;
@@ -34,4 +31,4 @@ private:
 
 };
 
-#endif //DTRACECONSUMER_STRACEHANDLER_H
+#endif

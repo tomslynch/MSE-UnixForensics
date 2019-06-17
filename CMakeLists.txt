@@ -1,20 +1,13 @@
 cmake_minimum_required(VERSION 3.12)
-project(DTraceConsumer)
+project(STraceConsumer)
 
 set(CMAKE_CXX_STANDARD 14)
 
-include_directories(/usr/src/cddl/compat/opensolaris/include)
-include_directories(/usr/src/cddl/contrib/opensolaris/lib/libdtrace/common/)
-include_directories(/usr/src/sys/cddl/compat/opensolaris)
-include_directories(/usr/src/sys/cddl/contrib/opensolaris/uts/common/)
-
-add_executable(DTraceConsumer main.cpp dtraceHandler.h dtraceHandler.cpp  IOHandler.h IOHandler.cpp)
+add_executable(STraceConsumer main.cpp IOHandler.h IOHandler.cpp straceHandler.cpp straceHandler.h)
 add_executable(HelloWorldTest tests/HelloWorldTest.cpp)
 add_executable(ReadFileTest tests/ReadFileTest.cpp)
 add_executable(BasicForkTest tests/BasicForkTest.cpp)
 
-TARGET_LINK_LIBRARIES(DTraceConsumer dtrace)
-TARGET_LINK_LIBRARIES(DTraceConsumer proc)
-TARGET_LINK_LIBRARIES(DTraceConsumer z)
-TARGET_LINK_LIBRARIES(DTraceConsumer pthread)
-TARGET_LINK_LIBRARIES(DTraceConsumer util)
+TARGET_LINK_LIBRARIES(STraceConsumer z)
+TARGET_LINK_LIBRARIES(STraceConsumer pthread)
+TARGET_LINK_LIBRARIES(STraceConsumer util)

@@ -1,38 +1,24 @@
-//
-// Created by thomaslynch on 4/9/19.
-//
-
 #include "straceHandler.h"
 using namespace std;
 
-void straceHandler::StartStraceProcess(const string& processID) {
+void straceHandler::StartStraceProcess(const string& processID, const string& reportName) {
+    setFn("strace_" + reportName);
     pid = fork();
-
     if (pid == 0) {
-        cout << "Starting strace..." << endl;
+        int rs = execl("/usr/bin/strace", "strace", "-tTyfyy", "-p", processID.c_str(), "-o", getFn().c_str(), nullptr);
+    }
+}
 
-        //tmp report name
-        time_t t = time(nullptr);
-        std::stringstream ss;
-        ss << t;
-        string tmpName = "strace_" + ss.str();
-        fn = tmpName;
-
-
-        int rs;
-//        if (strcmp(targetName.c_str(), "") != 0){
-            //-p "`pidof firefox`"
-//            rs = execl("/usr/bin/strace", "strace", "-rtTyfyy", "-n", targetName.c_str(), nullptr);
-//        } else {
-        rs = execl("/usr/bin/strace", "strace", "-tTyfyy", "-p", processID.c_str(), "-o", tmpName.c_str(), nullptr);
-//        }
-
-        printf("Exiting strace...");
+void straceHandler::StartStracePath(const string& path, const string& reportName) {
+    setFn("strace_" + reportName);
+    pid = fork();
+    if (pid == 0) {
+        int rs = execl("/usr/bin/strace", "strace", "-tTyfyy",  "-o", getFn().c_str(), path.c_str(), nullptr);
     }
 }
 
 const string &straceHandler::getFn() const {
-    return fn;
+    return straceHandler::fn;
 }
 
 void straceHandler::setFn(const string &fnIN) {
@@ -50,5 +36,5 @@ void straceHandler::setPid(int pidIN) {
 straceHandler::straceHandler(){
     fn = "";
     pid = -1;
-};
+}
 
